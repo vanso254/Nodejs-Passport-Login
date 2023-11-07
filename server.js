@@ -9,15 +9,27 @@ const passport = require('passport')
 const flash = require('express-flash')
 const session = require('express-session')
 const methodOverride = require('method-override')
+const mongoose=require('mongoose')
+const User=require('./userModels')
+
+//connecting the database
+mongoose.connect('mongodb://127.0.0.1:27017/nodePassportLogin',{
+    useNewUrlParser: true, useUnifiedTopology: true
+})
+
 
 const initializePassport = require('./passport-config')
 initializePassport(
   passport,
-  email => users.find(user => user.email === email),
-  id => users.find(user => user.id === id)
+  email => {
+    return User.findOne({ email: email }).exec();
+  },
+  id => {
+    return User.findById(id).exec();
+  }
 )
 
-const users = []
+
 
 app.set('view-engine', 'ejs')
 app.use(express.urlencoded({ extended: false }))
@@ -50,16 +62,18 @@ app.get('/register', checkNotAuthenticated, (req, res) => {
 })
 
 app.post('/register', checkNotAuthenticated, async (req, res) => {
+  const hashedPassword = await bcrypt.hash(req.body.password, 10)
+  const newUser = new User({
+    name: req.body.name,
+    email: req.body.email,
+    password: hashedPassword
+})
   try {
-    const hashedPassword = await bcrypt.hash(req.body.password, 10)
-    users.push({
-      id: Date.now().toString(),
-      name: req.body.name,
-      email: req.body.email,
-      password: hashedPassword
-    })
+    const user = await newUser.save();
+    console.log(user)
     res.redirect('/login')
-  } catch {
+  } catch(err) {
+    console.log(err)
     res.redirect('/register')
   }
 })
